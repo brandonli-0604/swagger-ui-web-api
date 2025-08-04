@@ -154,24 +154,6 @@ WebAPI/
 - [SwaggerUI Documentation](https://swagger.io/tools/swagger-ui/)
 - [OpenAPI Examples](https://github.com/OAI/OpenAPI-Specification/tree/master/examples)
 
-## 🔍 Tips for PDF Extraction
-
-When reviewing the PDF to extract API information:
-
-1. **Look for endpoint URLs** (usually in format `/api/v1/something`)
-2. **Identify HTTP methods** (GET, POST, PUT, DELETE)
-3. **Find request/response examples** (usually JSON format)
-4. **Note authentication requirements** (headers, tokens, etc.)
-5. **Extract error codes** and their meanings
-6. **Check for rate limiting** or other API constraints
-
-## ⚡ Next Steps
-
-1. **Review** the PDF specification thoroughly
-2. **Update** `api-spec.yaml` with actual API details
-3. **Test** the documentation by running `npm start`
-4. **Validate** that all endpoints and models are correctly documented
-5. **Share** the documentation URL with your team
 
 ## 🐛 Troubleshooting
 
