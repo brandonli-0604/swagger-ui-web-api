@@ -1,0 +1,638 @@
+openapi: 3.0.3
+info:
+  title: System 7000 REST API
+  description: |
+    Aristocrat Systems System 7000 REST API - 3rd Party Interface Specification
+    
+    The S7000 REST API is a standard facility for 3rd party vendors such as Point of Sale (POS) Systems, 
+    Membership Systems external to S7000, or any other External Systems who intend to interface to the S7000 system.
+    
+    **Key Features:**
+    - Member management (add, update, delete members)
+    - Point of Sale integration
+    - Session management with Bearer token authentication
+    - Member point balance and redemption
+    - Facial image management
+    - SQL query execution on S7000 database views
+    
+    **API Classes:**
+    - **Session**: Authentication and session management
+    - **Membership**: Member registration and management
+    - **POS**: Point of Sale operations and member validation
+    - **Export**: Data export and SQL query execution
+    
+    **Important Notes:**
+    - All URLs are case-sensitive
+    - Uses JSON format for communication
+    - Requires valid Registration Code, Username, and Password from Aristocrat
+    - Session tokens expire after a set period and must be renewed
+    
+  version: 1.29.0
+  contact:
+    name: Aristocrat Systems Support
+    email: support@aristocrat.com
+  license:
+    name: Commercial-in-Confidence
+    url: https://www.aristocrat.com
+
+servers:
+  - url: http://{serverIP}:{port}/api
+    description: System 7000 REST API Server
+    variables:
+      serverIP:
+        default: "127.0.0.1"
+        description: Web Server IP Address
+      port:
+        default: "8080"
+        description: Web Server Port
+
+paths:
+  /session/startWebSession:
+    post:
+      summary: Start Session - Login
+      description: |
+        Authenticate the supplied login credentials and issue a new session token.
+        This must be called before any other API requests.
+      operationId: startWebSession
+      tags:
+        - Session Management
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+            example:
+              registrationCode: "REG123456789ABCD"
+              userId: "testuser"
+              webPassword: "testpass123"
+      responses:
+        '201':
+          description: Authentication successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '400':
+          description: Invalid input data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Invalid registration code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /session/stopWebSession:
+    post:
+      summary: Stop Session - Logout
+      description: |
+        Logout or close the current S7000 web session.
+        Recommended to call when session is no longer required.
+      operationId: stopWebSession
+      tags:
+        - Session Management
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - sessionToken
+              properties:
+                sessionToken:
+                  type: string
+                  description: The current session token from startWebSession
+      responses:
+        '200':
+          description: Session closed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardResponse'
+
+  /membership/getNextMemberNumber:
+    get:
+      summary: Get Next Membership Number
+      description: |
+        Fetch the next available membership number from S7000.
+        Used when S7000 system maintains membership number sequencing.
+      operationId: getNextMemberNumber
+      tags:
+        - Membership
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Successfully retrieved next membership number
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StandardResponse'
+                  - type: object
+                    properties:
+                      membershipId:
+                        type: integer
+                        description: The next membership number
+                        example: 123456
+        '401':
+          description: Authentication error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Access forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /membership/addUpdateMember:
+    post:
+      summary: Add or Update Member Details
+      description: |
+        Add a new member or update existing member details in S7000.
+        Can also allocate cards, update analysis details, and manage member status.
+      operationId: addUpdateMember
+      tags:
+        - Membership
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MemberRequest'
+      responses:
+        '200':
+          description: Member successfully added or updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardResponse'
+        '400':
+          description: Invalid input data or validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+        '401':
+          description: Authentication error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /membership/deleteMember:
+    post:
+      summary: Delete Member
+      description: |
+        Delete a member from the S7000 system.
+        WARNING: This deletes all member history, cards, reward points, and activity.
+      operationId: deleteMember
+      tags:
+        - Membership
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - membershipId
+              properties:
+                membershipId:
+                  type: integer
+                  format: int64
+                  description: The membership number to delete
+                  example: 123456
+      responses:
+        '200':
+          description: Member successfully deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardResponse'
+        '400':
+          description: Invalid membership ID
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /pos/getMemberDetails:
+    post:
+      summary: Get Member Details for POS
+      description: |
+        Validate membership card and retrieve member details for Point of Sale operations.
+        Used when a member swipes their card at a POS terminal.
+      operationId: getMemberDetails
+      tags:
+        - Point of Sale
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - cardNumber
+                - locationNumber
+              properties:
+                cardNumber:
+                  type: string
+                  maxLength: 20
+                  description: S7000 membership card number
+                  example: "12345678901234567890"
+                locationNumber:
+                  type: integer
+                  description: POS till or location number
+                  example: 101
+      responses:
+        '200':
+          description: Member details retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StandardResponse'
+                  - $ref: '#/components/schemas/MemberDetailsResponse'
+        '404':
+          description: Member not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  schemas:
+    LoginRequest:
+      type: object
+      required:
+        - registrationCode
+        - userId
+        - webPassword
+      properties:
+        registrationCode:
+          type: string
+          maxLength: 16
+          description: Registration Code supplied by Aristocrat
+          example: "REG123456789ABCD"
+        userId:
+          type: string
+          maxLength: 8
+          description: Username supplied by Aristocrat
+          example: "testuser"
+        webPassword:
+          type: string
+          maxLength: 16
+          description: Password for the username
+          example: "testpass123"
+
+    LoginResponse:
+      allOf:
+        - $ref: '#/components/schemas/StandardResponse'
+        - type: object
+          properties:
+            sessionToken:
+              type: string
+              description: Unique identifier for the current session
+              example: "2a4e975f-6d30-4f0f-a6f1-6ac9a2db8588"
+            sessionExpireTime:
+              type: string
+              format: date-time
+              description: When the session will timeout
+              example: "2024-01-15T14:30:00Z"
+
+    MemberRequest:
+      type: object
+      required:
+        - firstName
+        - lastName
+        - membershipId
+        - dateOfBirth
+        - suspended
+        - memberStatus
+      properties:
+        firstName:
+          type: string
+          maxLength: 25
+          description: First name of the member
+          example: "John"
+        lastName:
+          type: string
+          maxLength: 25
+          description: Surname of the member
+          example: "Smith"
+        membershipId:
+          type: integer
+          format: int64
+          description: Unique membership number
+          example: 123456
+        title:
+          type: string
+          maxLength: 25
+          description: Title of member
+          example: "Mr."
+        dateOfBirth:
+          type: string
+          format: date
+          description: Date of birth (yyyy-MM-dd)
+          example: "1980-05-15"
+        dateOfJoining:
+          type: string
+          format: date
+          description: Date when member joined (defaults to current date if not supplied)
+          example: "2024-01-01"
+        gender:
+          type: string
+          enum: ["M", "F"]
+          description: Gender - M for Male, F for Female
+          example: "M"
+        telephone:
+          type: string
+          maxLength: 20
+          description: Home or primary telephone number
+          example: "+61234567890"
+        mobile:
+          type: string
+          maxLength: 20
+          description: Mobile phone number
+          example: "+61412345678"
+        address1:
+          type: string
+          maxLength: 60
+          description: Primary address line 1
+          example: "123 Main Street"
+        address2:
+          type: string
+          maxLength: 60
+          description: Primary address line 2
+          example: "Apartment 4B"
+        address3:
+          type: string
+          maxLength: 60
+          description: Primary address line 3
+        address4:
+          type: string
+          maxLength: 60
+          description: Primary address line 4
+        postcode:
+          type: string
+          maxLength: 12
+          description: Postal code
+          example: "2000"
+        barCode:
+          type: string
+          maxLength: 37
+          description: Mail barcode for address
+        email:
+          type: string
+          maxLength: 64
+          format: email
+          description: Email address
+          example: "john.smith@email.com"
+        cardNumber:
+          type: string
+          maxLength: 20
+          description: Membership card number (up to 20 digits)
+          example: "12345678901234567890"
+        cardType:
+          type: integer
+          description: Type of card associated with cardNumber
+          example: 1
+        dateExpiry:
+          type: string
+          format: date
+          description: Card expiry date
+          example: "2025-12-31"
+        suspended:
+          type: integer
+          enum: [0, 1]
+          description: Suspension status (0 = not suspended, 1 = suspended)
+          example: 0
+        memberStatus:
+          type: integer
+          enum: [0, 1, 2, 3]
+          description: |
+            Member status:
+            - 0: Pending
+            - 1: Active/Financial
+            - 2: Un-financial
+            - 3: Retired
+          example: 1
+        occupation:
+          type: string
+          maxLength: 30
+          description: Member's occupation
+          example: "Engineer"
+        analysisArray:
+          type: array
+          description: Array of analysis type and value pairs
+          items:
+            type: array
+            items:
+              type: string
+            minItems: 2
+            maxItems: 2
+          example: [["02", "35"], ["03", "25"]]
+        idType:
+          type: integer
+          enum: [5, 10, 15, 20]
+          description: |
+            ID document type:
+            - 5: Driver's License
+            - 10: Passport
+            - 15: Proof of Age Card
+            - 20: Birth Card
+          example: 5
+        idIssueDate:
+          type: string
+          format: date
+          description: ID document issue date
+          example: "2020-01-15"
+        idExpiryDate:
+          type: string
+          format: date
+          description: ID document expiry date
+          example: "2025-01-15"
+        idReference:
+          type: string
+          maxLength: 60
+          description: ID document reference number
+          example: "DL123456789"
+        membershipType:
+          type: integer
+          description: Membership type (should match cardType)
+          example: 1
+        cardLayout:
+          type: string
+          description: Text value of card type
+          example: "Standard"
+
+    MemberDetailsResponse:
+      type: object
+      properties:
+        membershipId:
+          type: integer
+          description: Member's membership number
+          example: 123456
+        firstName:
+          type: string
+          description: Member's first name
+          example: "John"
+        lastName:
+          type: string
+          description: Member's surname
+          example: "Smith"
+        gender:
+          type: string
+          enum: ["MALE", "FEMALE", "UNKNOWN"]
+          description: Member's gender
+          example: "MALE"
+        title:
+          type: string
+          description: Member's title
+          example: "Mr."
+        cardType:
+          type: string
+          description: Membership card type
+          example: "Standard"
+        cardNumber:
+          type: string
+          description: Member's card number
+          example: "12345678901234567890"
+        realName:
+          type: string
+          description: Member's associated name
+          example: "John Smith"
+        birthday:
+          type: string
+          enum: ["true", "false"]
+          description: Whether current date is member's birthday
+          example: "false"
+        idType:
+          type: integer
+          description: ID document type
+          example: 5
+        idIssueDate:
+          type: string
+          format: date
+          description: ID document issue date
+          example: "2020-01-15"
+        idExpiryDate:
+          type: string
+          format: date
+          description: ID document expiry date
+          example: "2025-01-15"
+        idReference:
+          type: string
+          description: ID document reference
+          example: "DL123456789"
+        membershipType:
+          type: integer
+          description: Member's membership type
+          example: 1
+        cardLayout:
+          type: string
+          description: Member's card layout
+          example: "Standard"
+
+    StandardResponse:
+      type: object
+      properties:
+        licenceStatus:
+          type: string
+          nullable: true
+          description: Contains "Expired" if client registration has expired
+          example: null
+        licenceExpiryDate:
+          type: string
+          nullable: true
+          format: date
+          description: Registration expiry date if expired
+          example: null
+        code:
+          type: integer
+          description: Response code (0 = success)
+          example: 0
+        message:
+          type: string
+          description: Response message
+          example: "Success"
+
+    ErrorResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          description: Error code
+          example: 40100
+        message:
+          type: string
+          description: Error message
+          example: "Authentication not found in header"
+
+    ValidationErrorResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          description: Error code
+          example: 40000
+        message:
+          type: string
+          description: Error message
+          example: "Validation failed for membership profile"
+        errorMap:
+          type: object
+          description: Map of field names to specific error messages
+          example:
+            membershipId: "Invalid Value"
+            dateOfBirth: "Invalid date format. Format must be yyyy-MM-dd"
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        Session token obtained from startWebSession.
+        Header format: Authorization: Bearer<session-token>
+        Example: Authorization: Bearer2a4e975f-6d30-4f0f-a6f1-6ac9a2db8588
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: Session Management
+    description: Authentication and session management operations
+  - name: Membership
+    description: Member registration and management operations
+  - name: Point of Sale
+    description: POS integration and member validation operations 

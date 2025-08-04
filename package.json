@@ -1,0 +1,29 @@
+{
+  "name": "system7000-api-docs",
+  "version": "1.0.0",
+  "description": "SwaggerUI documentation for System 7000 REST API",
+  "main": "main.js",
+  "scripts": {
+    "start": "npx http-server . -p 8080 -o",
+    "dev": "npx http-server . -p 8080 -o -c-1",
+    "install-deps": "npm install swagger-ui-dist http-server"
+  },
+  "keywords": [
+    "swagger",
+    "api",
+    "documentation",
+    "system7000",
+    "rest"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "swagger-ui-dist": "^5.10.5"
+  },
+  "devDependencies": {
+    "http-server": "^14.1.1"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  }
+} 
